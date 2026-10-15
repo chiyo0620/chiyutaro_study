@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学習タスクダッシュボード</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .task-checkbox:checked + div {
+      text-decoration: line-through;
+      color: #9ca3af;
+    }
+    .hidden-view {
+      display: none;
+    }
+    /* アプリ全体の背景をほんのり薄い水色に */
+    body {
+      background-color: #f0f9ff;
+    }
+  </style>
+</head>
+<body class="text-gray-800 font-sans antialiased pb-20">
+
+  <div class="max-w-md mx-auto bg-white min-h-screen shadow-lg relative pb-6">
+    
+    <!-- タブ切り替えボタン -->
+    <div class="flex p-2 bg-sky-50 rounded-b-xl gap-2 justify-center shadow-sm relative z-20">
+      <div id="tab-daily" onclick="switchTab('daily')" class="flex-1 py-2 rounded-lg text-center cursor-pointer text-sm font-bold bg-gradient-to-r from-cyan-400 to-blue-400 text-white shadow-md transition-all">📅 今日の予定</div>
+      <div id="tab-all" onclick="switchTab('all')" class="flex-1 py-2 rounded-lg text-center cursor-pointer text-sm font-bold bg-white text-gray-500 hover:bg-sky-100 transition-all">🗺️ 全体の予定</div>
+      <div id="tab-scope" onclick="switchTab('scope')" class="flex-1 py-2 rounded-lg text-center cursor-pointer text-sm font-bold bg-white text-gray-500 hover:bg-sky-100 transition-all">📚 テスト範囲</div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 日別ビュー -->
+    <!-- ============================================== -->
+    <div id="view-daily">
+      <!-- ヘッダー (水色グラデーション) -->
+      <header class="bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 text-white p-4 sticky top-0 z-10 shadow-md rounded-b-3xl mt-[-10px] pt-6">
+        <div class="flex justify-between items-center mb-2">
+          <button onclick="changeDate(-1)" class="p-2 bg-white/20 rounded-lg hover:bg-white/30 text-sm font-bold backdrop-blur-sm">◀ 前日</button>
+          <h1 id="current-date-display" class="text-xl font-extrabold text-center tracking-wide">10/15 (木)</h1>
+          <button onclick="changeDate(1)" class="p-2 bg-white/20 rounded-lg hover:bg-white/30 text-sm font-bold backdrop-blur-sm">翌日 ▶</button>
+        </div>
+        <div class="text-center text-sm bg-white/20 rounded-full py-1.5 mt-2 font-medium backdrop-blur-sm shadow-inner">
+          <span id="target-time-display">目標学習時間: 1時間</span>
+          <span class="mx-2 opacity-50">|</span>
+          <span id="test-countdown">中間テストまで あと11日</span>
+        </div>
+      </header>
+
+      <!-- 今日のコメント欄 -->
+      <div id="daily-comment-container" class="mt-5 mx-4 bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl shadow-sm border border-blue-100 p-3 flex items-start space-x-3 hidden-view">
+        <div class="text-2xl animate-bounce">💬</div>
+        <div>
+          <p class="text-xs text-blue-500 font-bold mb-0.5">今日のコメント</p>
+          <p id="daily-comment-text" class="text-sm text-gray-700 font-medium leading-relaxed"></p>
+        </div>
+      </div>
+
+      <main class="p-4 space-y-5" id="task-container"></main>
+
+      <!-- クイック追加バー -->
+      <div class="mx-4 mb-4 p-4 bg-gray-50 border border-gray-100 rounded-xl shadow-inner">
+        <h3 class="text-sm font-bold text-gray-500 mb-2">＋ タスクを追加入力</h3>
+        <div class="flex space-x-2 mb-2">
+          <select id="new-task-category" class="border border-gray-200 rounded-lg p-2 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-300">
+            <option value="homework">宿題</option>
+            <option value="math">数学</option>
+            <option value="other">他教科</option>
+          </select>
+          <input type="text" id="new-task-text" placeholder="例: 幾何プリントNo.4" class="border border-gray-200 rounded-lg p-2 text-sm flex-grow focus:outline-none focus:ring-2 focus:ring-cyan-300">
+        </div>
+        <button onclick="addTask()" class="w-full bg-gray-700 text-white rounded-lg p-2 text-sm font-bold hover:bg-gray-800 transition-colors">
+          今日に追加する
+        </button>
+      </div>
+
+      <div class="px-4 pb-4">
+        <button id="complete-btn" onclick="completeDay()" class="w-full bg-gradient-to-r from-cyan-400 to-blue-500 text-white rounded-xl p-3.5 font-bold text-lg shadow-lg hover:from-cyan-500 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all" disabled>
+          本日の学習をすべて完了！✨
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 全体ビュー -->
+    <!-- ============================================== -->
+    <div id="view-all" class="hidden-view p-4">
+      <h2 class="text-xl font-extrabold mb-4 text-blue-600 text-center border-b-2 border-blue-100 pb-2">中間テストまでの道のり</h2>
+      <div id="all-schedule-container" class="space-y-4"></div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- テスト範囲ビュー -->
+    <!-- ============================================== -->
+    <div id="view-scope" class="hidden-view p-4 space-y-4">
+      <h2 class="text-xl font-extrabold mb-2 text-blue-600 text-center border-b-2 border-blue-100 pb-2">中間テスト試験範囲</h2>
+      <!-- 各教科の枠 -->
+      <div class="bg-white rounded-xl shadow-sm border border-blue-100 p-3">
+        <h3 class="font-bold text-blue-500 border-b border-blue-50 pb-1 mb-2">📐 代数（正負の数）</h3>
+        <ul class="text-sm space-y-1 text-gray-600 list-disc list-inside">
+          <li>教科書（代数I）：P3〜23</li>
+          <li>プリント：No.1〜No.21</li>
+          <li>問題集（巻末）：P2〜11</li>
+        </ul>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-blue-100 p-3">
+        <h3 class="font-bold text-blue-500 border-b border-blue-50 pb-1 mb-2">🔺 幾何（平面図形 ※図形の移動まで）</h3>
+        <ul class="text-sm space-y-1 text-gray-600 list-disc list-inside">
+          <li>教科書（幾何I）：P3〜14</li>
+          <li>プリント：No.1〜No.7</li>
+          <li>問題集（巻末）：P2〜7</li>
+        </ul>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-emerald-100 p-3">
+        <h3 class="font-bold text-emerald-500 border-b border-emerald-50 pb-1 mb-2">🔤 英語</h3>
+        <ul class="text-sm space-y-1 text-gray-600 list-disc list-inside">
+          <li>グラマー：プリントNo.1~70、不規則変化</li>
+          <li>テキスト：New Treasure I p.8~44</li>
+          <li>文法問題集：p.5~31 / WORKBOOK：p.5~24</li>
+          <li>リーディング：Units 1, 2, 3, 5</li>
+          <li>コミュ：Everybody Up 4 Unit 8</li>
+        </ul>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-cyan-100 p-3">
+        <h3 class="font-bold text-cyan-600 border-b border-cyan-50 pb-1 mb-2">📖 国語</h3>
+        <ul class="text-sm space-y-1 text-gray-600 list-disc list-inside">
+          <li>漢字（2学期にやったもの）</li>
+          <li>「やまなし」「イーハトーヴの夢」</li>
+          <li>「かなえられた願い」</li>
+          <li>形容詞、形容動詞、動詞の活用</li>
+        </ul>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-orange-100 p-3">
+        <h3 class="font-bold text-orange-500 border-b border-orange-50 pb-1 mb-2">🔬 理科</h3>
+        <ul class="text-sm space-y-1 text-gray-600 list-disc list-inside">
+          <li>理科I：電気と生活（プNo.16~23、問 p.24~27, 228~235）</li>
+          <li>理科II：肉食と草食、分類（問 p.20~27）</li>
+        </ul>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-purple-100 p-3">
+        <h3 class="font-bold text-purple-500 border-b border-purple-50 pb-1 mb-2">🌏 社会</h3>
+        <ul class="text-sm space-y-1 text-gray-600 list-disc list-inside">
+          <li>教科書p.51〜p.73</li>
+          <li>時事問題</li>
+        </ul>
+      </div>
+      <div class="bg-yellow-50 rounded-xl shadow-sm border border-yellow-200 p-3 mt-4">
+        <h3 class="font-bold text-yellow-700 mb-1">💡 先生からのアドバイス</h3>
+        <p class="text-sm text-yellow-800 font-bold">「答えを見て、解法を理解すること。」</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ▼ 最新のタスクデータを一括登録 ▼
+    const initialTasks = [
+      // 10/15
+      { id: 1, date: "2026-10-15", category: "homework", text: "プリントNo.16の裏", completed: false, deadline: "本日22:00締切" },
+      { id: 2, date: "2026-10-15", category: "homework", text: "プリントNo.17の表", completed: false, deadline: "明日13:55締切" },
+      { id: 3, date: "2026-10-15", category: "other", text: "B英会話", completed: false },
+      // 10/16
+      { id: 4, date: "2026-10-16", category: "math", text: "[代数問題集] 正負の数の加減A", completed: false },
+      { id: 5, date: "2026-10-16", category: "math", text: "[代数問題集] 正負の数の加減B", completed: false },
+      // 10/17
+      { id: 6, date: "2026-10-17", category: "math", text: "[代数問題集] 正負の数の除法A", completed: false },
+      { id: 7, date: "2026-10-17", category: "math", text: "[代数問題集] 正負の数の除法B", completed: false },
+      { id: 8, date: "2026-10-17", category: "homework", text: "[社会] テスト対策プリント提出", completed: false },
+      { id: 9, date: "2026-10-17", category: "other", text: "[社会] テスト範囲の漫画を読む", completed: false },
+      { id: 10, date: "2026-10-17", category: "other", text: "プリントの用語がでてきたら書き出す", completed: false },
+      // 10/18
+      { id: 11, date: "2026-10-18", category: "math", text: "[幾何問題集] 対称と移動A", completed: false },
+      { id: 12, date: "2026-10-18", category: "math", text: "[代数問題集] 正負の数の四則計算A", completed: false },
+      { id: 13, date: "2026-10-18", category: "math", text: "[代数問題集] 正負の数の四則計算B", completed: false },
+      { id: 14, date: "2026-10-18", category: "homework", text: "自主学習ノート", completed: false, deadline: "本日22:00締切" },
+      // 10/19
+      { id: 15, date: "2026-10-19", category: "math", text: "代数単元テストに向けた「印をつけた問題」の反復", completed: false },
+      { id: 16, date: "2026-10-19", category: "homework", text: "プリントNo.20の裏、No.21の裏", completed: false, deadline: "10/21締切" },
+      // 10/20
+      { id: 17, date: "2026-10-20", category: "math", text: "代数プリントNo.1〜21と問題集の総復習（間違えた箇所のみ）", completed: false },
+      // 10/21
+      { id: 18, date: "2026-10-21", category: "math", text: "幾何プリントNo.1〜7と問題集の総復習", completed: false },
+      // 10/22
+      { id: 19, date: "2026-10-22", category: "math", text: "単元テストの解き直し", completed: false },
+      { id: 20, date: "2026-10-22", category: "other", text: "B英会話", completed: false },
+      // 10/23
+      { id: 21, date: "2026-10-23", category: "math", text: "単元テストで間違えた問題の徹底分析", completed: false },
+      { id: 22, date: "2026-10-23", category: "math", text: "代数・幾何「印をつけた問題」の反復", completed: false },
+      { id: 23, date: "2026-10-23", category: "other", text: "[国語文法]", completed: false },
+      { id: 24, date: "2026-10-23", category: "other", text: "[理科1] 問題集P26,27練習問題", completed: false },
+      // 10/24
+      { id: 25, date: "2026-10-24", category: "math", text: "「印をつけた問題」の反復", completed: false },
+      { id: 26, date: "2026-10-24", category: "other", text: "[理科1] 問題集P232～235標準問題、実力問題", completed: false },
+      { id: 27, date: "2026-10-24", category: "other", text: "[国語文法]", completed: false },
+      // 10/25
+      { id: 28, date: "2026-10-25", category: "math", text: "「印をつけた問題」の反復", completed: false },
+      { id: 29, date: "2026-10-25", category: "other", text: "[英語] プリント見直し・不規則動詞確認", completed: false },
+      { id: 30, date: "2026-10-25", category: "other", text: "[国語] ノート見直し、漢字・文法の最終確認", completed: false },
+      // 10/26
+      { id: 31, date: "2026-10-26", category: "other", text: "[理科2] プリントの暗記と演習", completed: false },
+      // 10/27
+      { id: 32, date: "2026-10-27", category: "math", text: "「印をつけた問題」の反復", completed: false },
+      { id: 33, date: "2026-10-27", category: "other", text: "[社会] プリント見直し", completed: false }
+    ];
+
+    const targetTimes = {
+      "2026-10-14": "2時間", "2026-10-15": "1時間", "2026-10-16": "2時間",
+      "2026-10-17": "4.5時間", "2026-10-18": "4.5時間", "2026-10-19": "2時間",
+      "2026-10-20": "2時間", "2026-10-21": "2時間", "2026-10-22": "1時間",
+      "2026-10-23": "2時間", "2026-10-24": "4.5時間", "2026-10-25": "4.5時間",
+      "2026-10-26": "2時間", "2026-10-27": "2時間", "2026-10-28": "-"
+    };
+
+    // ▼ 新規：日別コメント（テスト日程やアドバイス）▼
+    const dailyComments = {
+      "2026-10-17": "【他教科宿題】 週末に一気に片付ける！",
+      "2026-10-20": "【明日は代数 単元テスト！】\n※幾何の追加プリント（No.4〜7）が出たら着手すること",
+      "2026-10-21": "🔥 代数 単元テスト当日！\n【明日は幾何 単元テスト！】",
+      "2026-10-22": "🔥 幾何 単元テスト当日！",
+      "2026-10-26": "🔥 中間テスト1日目（代数・英語・国語）\nいよいよ本番！落ち着いて頑張って！",
+      "2026-10-27": "🔥 中間テスト2日目（理科）\n油断せずに最後まで！",
+      "2026-10-28": "🎉 中間テスト最終日（社会・幾何）\nお疲れ様！終わったらゆっくり休んでね！"
+    };
+
+    const categoryConfig = {
+      homework: { title: '【至急・宿題】', color: 'bg-red-50 text-red-700 border-red-200', tag: '宿題' },
+      math: { title: '【数学（代数・幾何）】', color: 'bg-blue-50 text-blue-700 border-blue-200', tag: '数学' },
+      other: { title: '【他教科】', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', tag: '他教科' }
+    };
+
+    // v5にしてデータを確実に更新します
+    let tasks = JSON.parse(localStorage.getItem('studyTasks_v5')) || initialTasks;
+    let currentDateObj = new Date(2026, 9, 15);
+    const testDate = new Date(2026, 9, 26);
+
+    function switchTab(tabName) {
+      ['daily', 'all', 'scope'].forEach(name => {
+        document.getElementById(`view-${name}`).classList.add('hidden-view');
+        const tabEl = document.getElementById(`tab-${name}`);
+        tabEl.className = "flex-1 py-2 rounded-lg text-center cursor-pointer text-sm font-bold bg-white text-gray-500 hover:bg-sky-100 transition-all";
+      });
+
+      document.getElementById(`view-${tabName}`).classList.remove('hidden-view');
+      document.getElementById(`tab-${tabName}`).className = "flex-1 py-2 rounded-lg text-center cursor-pointer text-sm font-bold bg-gradient-to-r from-cyan-400 to-blue-400 text-white shadow-md transition-all";
+
+      if (tabName === 'daily') renderDaily();
+      if (tabName === 'all') renderAll();
+    }
+
+    function formatDateString(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function getDayOfWeek(dateString) {
+      const date = new Date(dateString);
+      return ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
+    }
+
+    function changeDate(offset) {
+      currentDateObj.setDate(currentDateObj.getDate() + offset);
+      renderDaily();
+    }
+
+    function saveTasks() {
+      localStorage.setItem('studyTasks_v5', JSON.stringify(tasks));
+      renderDaily();
+      if (!document.getElementById('view-all').classList.contains('hidden-view')) {
+        renderAll();
+      }
+    }
+
+    function toggleTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        task.completed = !task.completed;
+        saveTasks();
+      }
+    }
+
+    function postponeTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        const parts = task.date.split('-');
+        const taskDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        taskDate.setDate(taskDate.getDate() + 1);
+        task.date = formatDateString(taskDate);
+        saveTasks();
+      }
+    }
+
+    function addTask() {
+      const textInput = document.getElementById('new-task-text');
+      const catInput = document.getElementById('new-task-category');
+      if (!textInput.value.trim()) return;
+      tasks.push({
+        id: Date.now(),
+        date: formatDateString(currentDateObj),
+        category: catInput.value,
+        text: textInput.value.trim(),
+        completed: false
+      });
+      textInput.value = '';
+      saveTasks();
+    }
+
+    function renderDaily() {
+      const dateStr = formatDateString(currentDateObj);
+      const displayDate = `${currentDateObj.getMonth() + 1}/${currentDateObj.getDate()} (${getDayOfWeek(dateStr)})`;
+      
+      document.getElementById('current-date-display').innerText = displayDate;
+      document.getElementById('target-time-display').innerText = `目標: ${targetTimes[dateStr] || 'なし'}`;
+      
+      const diffTime = Math.ceil((testDate - currentDateObj) / (1000 * 60 * 60 * 24));
+      document.getElementById('test-countdown').innerText = diffTime > 0 ? `テストまで あと${diffTime}日` : (diffTime === 0 ? 'テスト初日！' : 'テスト期間中');
+
+      // コメントの表示制御 (改行対応)
+      const commentText = dailyComments[dateStr];
+      const commentContainer = document.getElementById('daily-comment-container');
+      if (commentText) {
+        document.getElementById('daily-comment-text').innerHTML = commentText.replace(/\n/g, '<br>');
+        commentContainer.classList.remove('hidden-view');
+      } else {
+        commentContainer.classList.add('hidden-view');
+      }
+
+      const container = document.getElementById('task-container');
+      container.innerHTML = '';
+
+      const todaysTasks = tasks.filter(t => t.date === dateStr);
+      let allCompleted = todaysTasks.length > 0;
+
+      ['homework', 'math', 'other'].forEach(catKey => {
+        const catTasks = todaysTasks.filter(t => t.category === catKey);
+        const config = categoryConfig[catKey];
+
+        let html = `<div class="rounded-xl border ${config.color} p-3 shadow-sm bg-white/50 backdrop-blur-sm">
+                      <h2 class="font-bold border-b border-current pb-1 mb-2">${config.title}</h2>`;
+        if (catTasks.length === 0) {
+          html += `<p class="text-sm opacity-50">（予定なし）</p>`;
+        } else {
+          catTasks.forEach(task => {
+            if (!task.completed) allCompleted = false;
+            html += `
+              <div class="flex items-center justify-between bg-white rounded-lg p-2 mb-2 shadow-sm border border-gray-100 text-gray-800 hover:border-cyan-200 transition-colors">
+                <label class="flex items-center flex-grow cursor-pointer">
+                  <input type="checkbox" class="task-checkbox w-5 h-5 text-cyan-500 rounded border-gray-300 focus:ring-cyan-400 mr-3" 
+                         ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id})">
+                  <div class="flex flex-col">
+                    <span class="text-sm font-medium ${task.completed ? 'opacity-50' : ''}">${task.text}</span>
+                    ${task.deadline && !task.completed ? `<span class="text-[11px] font-bold bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded mt-1 inline-block w-max">⏰ ${task.deadline}</span>` : ''}
+                  </div>
+                </label>
+                <button onclick="postponeTask(${task.id})" class="ml-2 text-[11px] font-bold text-gray-400 hover:text-blue-500 bg-gray-50 p-2 rounded-lg min-w-max transition-colors">翌日へ ➡</button>
+              </div>`;
+          });
+        }
+        html += `</div>`;
+        container.insertAdjacentHTML('beforeend', html);
+      });
+
+      document.getElementById('complete-btn').disabled = !allCompleted;
+    }
+
+    function renderAll() {
+      const container = document.getElementById('all-schedule-container');
+      container.innerHTML = '';
+      const allDates = [...new Set(Object.keys(targetTimes).concat(tasks.map(t => t.date)))].sort();
+
+      allDates.forEach(dateStr => {
+        const parts = dateStr.split('-');
+        const dateDisplay = `${parseInt(parts[1])}/${parseInt(parts[2])} (${getDayOfWeek(dateStr)})`;
+        const dayTasks = tasks.filter(t => t.date === dateStr);
+        const tTime = targetTimes[dateStr] || 'なし';
+
+        let html = `
+          <div class="bg-white rounded-xl shadow-sm border border-sky-50 overflow-hidden">
+            <div class="bg-blue-50 p-2 border-b border-blue-100 flex justify-between items-center">
+              <span class="font-bold text-blue-700">${dateDisplay}</span>
+              <span class="text-xs text-blue-500 bg-white px-2 py-1 rounded-md border border-blue-200 font-bold">目標: ${tTime}</span>
+            </div>
+            <div class="p-3">
+        `;
+
+        if (dayTasks.length === 0) {
+          html += `<p class="text-sm text-gray-400">タスクなし</p>`;
+        } else {
+          html += `<ul class="space-y-2">`;
+          dayTasks.forEach(task => {
+            const config = categoryConfig[task.category];
+            html += `
+              <li class="flex items-start text-sm">
+                <span class="inline-block w-4 h-4 mr-2 text-center ${task.completed ? 'text-emerald-400' : 'text-gray-200'}">
+                  ${task.completed ? '✔' : '⬜'}
+                </span>
+                <span class="px-1.5 py-0.5 rounded text-[10px] mr-2 font-bold ${config.color.split(' ')[0]} ${config.color.split(' ')[1]} border">
+                  ${config.tag}
+                </span>
+                <span class="flex-grow ${task.completed ? 'line-through text-gray-300' : 'text-gray-600'} font-medium">${task.text}</span>
+              </li>`;
+          });
+          html += `</ul>`;
+        }
+        html += `</div></div>`;
+        container.insertAdjacentHTML('beforeend', html);
+      });
+    }
+
+    renderDaily();
+  </script>
+</body>
+</html>
