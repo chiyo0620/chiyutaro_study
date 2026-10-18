@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学習タスクダッシュボード</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- iPadでのドラッグ＆ドロップ用ライブラリ -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <style>
+    .task-checkbox:checked + div {
+      text-decoration: line-through;
+      color: #9ca3af;
+    }
+    .hidden-view {
+      display: none;
+    }
+    body {
+      background-color: #f0f9ff;
+    }
+    .sortable-ghost {
+      opacity: 0.4;
+      background-color: #e0f2fe;
+    }
+  </style>
+</head>
+<body class="text-gray-800 font-sans antialiased pb-20">
+
+  <div class="max-w-md mx-auto bg-white min-h-screen shadow-lg relative pb-6">
+    
+    <!-- 4つのタブ切り替え -->
+    <div class="flex p-1.5 bg-sky-50 rounded-b-xl gap-1 justify-center shadow-sm relative z-20">
+      <div id="tab-daily" onclick="switchTab('daily')" class="flex-1 py-2.5 rounded-lg text-center cursor-pointer text-xs font-bold bg-gradient-to-r from-cyan-400 to-blue-400 text-white shadow-md transition-all">📅 今日</div>
+      <div id="tab-all" onclick="switchTab('all')" class="flex-1 py-2.5 rounded-lg text-center cursor-pointer text-xs font-bold bg-white text-gray-500 hover:bg-sky-100 transition-all">🗺️ 全体</div>
+      <div id="tab-scope" onclick="switchTab('scope')" class="flex-1 py-2.5 rounded-lg text-center cursor-pointer text-xs font-bold bg-white text-gray-500 hover:bg-sky-100 transition-all">📚 範囲</div>
+      <div id="tab-import" onclick="switchTab('import')" class="flex-1 py-2.5 rounded-lg text-center cursor-pointer text-xs font-bold bg-white text-gray-500 hover:bg-sky-100 transition-all">⚙️ 取込</div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 1. 日別ビュー -->
+    <!-- ============================================== -->
+    <div id="view-daily">
+      <header class="bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 text-white p-4 sticky top-0 z-10 shadow-md rounded-b-3xl mt-[-10px] pt-6">
+        <div class="flex justify-between items-center mb-2">
+          <button onclick="changeDate(-1)" class="p-2 bg-white/20 rounded-lg hover:bg-white/30 text-sm font-bold backdrop-blur-sm">◀ 前日</button>
+          <h1 id="current-date-display" class="text-xl font-extrabold text-center tracking-wide">10/15 (木)</h1>
+          <button onclick="changeDate(1)" class="p-2 bg-white/20 rounded-lg hover:bg-white/30 text-sm font-bold backdrop-blur-sm">翌日 ▶</button>
+        </div>
+        <div class="text-center text-sm bg-white/20 rounded-full py-1.5 mt-2 font-medium backdrop-blur-sm shadow-inner">
+          <span id="target-time-display">目標学習時間: 1時間</span>
+          <span class="mx-2 opacity-50">|</span>
+          <span id="test-countdown">ダッシュボード</span>
+        </div>
+      </header>
+
+      <div id="daily-comment-container" class="mt-5 mx-4 bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl shadow-sm border border-blue-100 p-3 flex items-start space-x-3 hidden-view">
+        <div class="text-2xl animate-bounce">💬</div>
+        <div>
+          <p class="text-xs text-blue-500 font-bold mb-0.5">今日のコメント</p>
+          <p id="daily-comment-text" class="text-sm text-gray-700 font-medium leading-relaxed"></p>
+        </div>
+      </div>
+
+      <main class="p-4 space-y-5" id="task-container"></main>
+
+      <div class="px-4 pb-4 mt-4">
+        <button id="complete-btn" onclick="completeDay()" class="w-full bg-gradient-to-r from-cyan-400 to-blue-500 text-white rounded-xl p-3.5 font-bold text-lg shadow-lg hover:from-cyan-500 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all" disabled>
+          本日の学習をすべて完了！✨
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 2. 全体ビュー -->
+    <!-- ============================================== -->
+    <div id="view-all" class="hidden-view p-4">
+      <h2 class="text-xl font-extrabold mb-4 text-blue-600 text-center border-b-2 border-blue-100 pb-2">スケジュール全体の管理</h2>
+      
+      <div class="mb-6 p-4 bg-sky-50 border border-blue-100 rounded-xl shadow-sm">
+        <h3 class="text-sm font-bold text-blue-600 mb-2">＋ 新しいタスクを登録</h3>
+        <div class="flex flex-col space-y-2 mb-2">
+          <div class="flex space-x-2">
+            <input type="date" id="new-task-date" class="border border-gray-200 rounded-lg p-2 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-300 w-1/2">
+            <select id="new-task-category" class="border border-gray-200 rounded-lg p-2 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-300 w-1/2">
+              <option value="homework">宿題</option>
+              <option value="math">数学</option>
+              <option value="other">他教科</option>
+            </select>
+          </div>
+          <input type="text" id="new-task-text" placeholder="例: 幾何プリントNo.4" class="border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-300">
+        </div>
+        <button onclick="addTaskFromAllView()" class="w-full bg-blue-500 text-white rounded-lg p-2 text-sm font-bold hover:bg-blue-600 transition-colors">
+          スケジュールに追加
+        </button>
+      </div>
+
+      <div id="all-schedule-container" class="space-y-4"></div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 3. テスト範囲ビュー -->
+    <!-- ============================================== -->
+    <div id="view-scope" class="hidden-view p-4 space-y-4">
+      <div class="flex justify-between items-center border-b-2 border-blue-100 pb-2">
+        <h2 class="text-xl font-extrabold text-blue-600">試験範囲（メモ）</h2>
+        <!-- 範囲メモの簡易編集機能 -->
+        <button onclick="editScopeMemo()" class="text-sm bg-white border border-gray-300 rounded px-2 py-1 text-gray-600 hover:bg-gray-50">編集✏️</button>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-blue-100 p-4">
+        <textarea id="scope-memo-text" class="w-full h-64 text-sm text-gray-700 p-2 border-none focus:ring-0 resize-none bg-transparent" readonly></textarea>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 4. データ取込ビュー -->
+    <!-- ============================================== -->
+    <div id="view-import" class="hidden-view p-4 space-y-4">
+      <h2 class="text-xl font-extrabold mb-2 text-blue-600 text-center border-b-2 border-blue-100 pb-2">⚙️ スプレッドシート連携</h2>
+      
+      <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-yellow-800 shadow-sm">
+        <p class="font-bold mb-1">【使い方】</p>
+        <p>1. iPadのスプレッドシートを開く</p>
+        <p>2. 下記の7列が含まれる表をコピーする<br>
+           <span class="text-xs text-gray-500">（日付, 曜日, 学習時間, 数学, 宿題, 他教科, コメント）</span></p>
+        <p>3. 下の入力欄に「ペースト（貼り付け）」する</p>
+        <p>4. 「データを取り込む」ボタンを押す</p>
+      </div>
+
+      <textarea id="import-textarea" class="w-full h-48 border border-gray-300 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-300 shadow-inner" placeholder="ここにスプレッドシートの表をペーストしてください..."></textarea>
+
+      <button onclick="processImport()" class="w-full bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl p-3.5 font-bold text-lg shadow-lg hover:from-red-600 hover:to-rose-600 transition-all">
+        データを取り込む（上書き）
+      </button>
+      <p class="text-[10px] text-center text-gray-500 mt-2">※現在のタスクやチェック状態はすべてリセットされます。</p>
+    </div>
+
+  </div>
+
+  <script>
+    // --- 初期データ（初回ロード時用） ---
+    const fallbackTasks = [
+      { id: 1, date: "2026-10-15", category: "homework", text: "初期データ：スプレッドシートから取り込んでください", completed: false }
+    ];
+    const fallbackTargetTimes = {};
+    const fallbackDailyComments = {};
+    const fallbackScopeMemo = "ここにテスト範囲やメモを記載できます。\n「編集」ボタンから書き換えてください。";
+
+    const categoryConfig = {
+      homework: { title: '【至急・宿題】', color: 'bg-red-50 text-red-700 border-red-200', tag: '宿題' },
+      math: { title: '【数学（代数・幾何）】', color: 'bg-blue-50 text-blue-700 border-blue-200', tag: '数学' },
+      other: { title: '【他教科】', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', tag: '他教科' }
+    };
+
+    // --- State Management ---
+    let tasks = JSON.parse(localStorage.getItem('studyTasks_v9')) || fallbackTasks;
+    let targetTimes = JSON.parse(localStorage.getItem('studyTargetTimes_v9')) || fallbackTargetTimes;
+    let dailyComments = JSON.parse(localStorage.getItem('studyComments_v9')) || fallbackDailyComments;
+    let scopeMemo = localStorage.getItem('studyScopeMemo_v9') || fallbackScopeMemo;
+    
+    let currentDateObj = new Date();
+    if (tasks.length > 0 && tasks[0].date !== "2026-10-15") {
+      const dates = tasks.map(t => t.date).sort();
+      const parts = dates[0].split('-');
+      currentDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    // --- UI Navigation ---
+    function switchTab(tabName) {
+      ['daily', 'all', 'scope', 'import'].forEach(name => {
+        document.getElementById(`view-${name}`).classList.add('hidden-view');
+        const tabEl = document.getElementById(`tab-${name}`);
+        tabEl.className = "flex-1 py-2.5 rounded-lg text-center cursor-pointer text-xs font-bold bg-white text-gray-500 hover:bg-sky-100 transition-all";
+      });
+
+      document.getElementById(`view-${tabName}`).classList.remove('hidden-view');
+      document.getElementById(`tab-${tabName}`).className = "flex-1 py-2.5 rounded-lg text-center cursor-pointer text-xs font-bold bg-gradient-to-r from-cyan-400 to-blue-400 text-white shadow-md transition-all";
+
+      if (tabName === 'daily') renderDaily();
+      if (tabName === 'all') renderAll();
+      if (tabName === 'scope') renderScope();
+    }
+
+    // --- Helpers ---
+    function formatDateString(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function getDayOfWeek(dateString) {
+      const date = new Date(dateString);
+      return ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
+    }
+
+    function changeDate(offset) {
+      currentDateObj.setDate(currentDateObj.getDate() + offset);
+      renderDaily();
+    }
+
+    function saveAllState() {
+      localStorage.setItem('studyTasks_v9', JSON.stringify(tasks));
+      localStorage.setItem('studyTargetTimes_v9', JSON.stringify(targetTimes));
+      localStorage.setItem('studyComments_v9', JSON.stringify(dailyComments));
+      localStorage.setItem('studyScopeMemo_v9', scopeMemo);
+      
+      if (!document.getElementById('view-daily').classList.contains('hidden-view')) renderDaily();
+      if (!document.getElementById('view-all').classList.contains('hidden-view')) renderAll();
+    }
+
+    // --- Task Actions ---
+    function toggleTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        task.completed = !task.completed;
+        saveAllState();
+      }
+    }
+
+    function editTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        const newText = prompt('タスク名を変更します:', task.text);
+        if (newText !== null && newText.trim() !== '') {
+          task.text = newText.trim();
+          saveAllState();
+        }
+      }
+    }
+
+    function deleteTask(id) {
+      if (confirm('このタスクを削除してもよろしいですか？')) {
+        tasks = tasks.filter(t => t.id !== id);
+        saveAllState();
+      }
+    }
+
+    function postponeTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        const parts = task.date.split('-');
+        const taskDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        taskDate.setDate(taskDate.getDate() + 1);
+        task.date = formatDateString(taskDate);
+        saveAllState();
+      }
+    }
+
+    function addTaskFromAllView() {
+      const dateInput = document.getElementById('new-task-date').value;
+      const catInput = document.getElementById('new-task-category').value;
+      const textInput = document.getElementById('new-task-text');
+      
+      if (!dateInput) return alert('日付を選択してください');
+      if (!textInput.value.trim()) return alert('タスクの内容を入力してください');
+
+      tasks.push({
+        id: Date.now(),
+        date: dateInput,
+        category: catInput,
+        text: textInput.value.trim(),
+        completed: false
+      });
+      textInput.value = '';
+      saveAllState();
+      alert('追加しました！');
+    }
+
+    function completeDay() {
+      alert('【完了報告】\n今日のタスクをすべてクリアしました！お疲れ様です！✨');
+    }
+
+    // --- Render Scope (試験範囲メモ) ---
+    function renderScope() {
+      document.getElementById('scope-memo-text').value = scopeMemo;
+    }
+
+    function editScopeMemo() {
+      const el = document.getElementById('scope-memo-text');
+      if (el.hasAttribute('readonly')) {
+        el.removeAttribute('readonly');
+        el.focus();
+        el.classList.add('bg-blue-50', 'border-2', 'border-blue-400');
+        event.target.innerText = "保存💾";
+      } else {
+        scopeMemo = el.value;
+        saveAllState();
+        el.setAttribute('readonly', 'true');
+        el.classList.remove('bg-blue-50', 'border-2', 'border-blue-400');
+        event.target.innerText = "編集✏️";
+        alert('範囲メモを保存しました。');
+      }
+    }
+
+    // --- Render Daily ---
+    function renderDaily() {
+      const dateStr = formatDateString(currentDateObj);
+      const displayDate = `${currentDateObj.getMonth() + 1}/${currentDateObj.getDate()} (${getDayOfWeek(dateStr)})`;
+      
+      document.getElementById('current-date-display').innerText = displayDate;
+      document.getElementById('target-time-display').innerText = `目標: ${targetTimes[dateStr] || '設定なし'}`;
+
+      const commentText = dailyComments[dateStr];
+      const commentContainer = document.getElementById('daily-comment-container');
+      if (commentText) {
+        document.getElementById('daily-comment-text').innerHTML = commentText.replace(/\n/g, '<br>');
+        commentContainer.classList.remove('hidden-view');
+      } else {
+        commentContainer.classList.add('hidden-view');
+      }
+
+      const container = document.getElementById('task-container');
+      container.innerHTML = '';
+
+      const todaysTasks = tasks.filter(t => t.date === dateStr);
+      let allCompleted = todaysTasks.length > 0;
+
+      ['homework', 'math', 'other'].forEach(catKey => {
+        const catTasks = todaysTasks.filter(t => t.category === catKey);
+        const config = categoryConfig[catKey];
+
+        let html = `<div class="rounded-xl border ${config.color} p-3 shadow-sm bg-white/50 backdrop-blur-sm">
+                      <h2 class="font-bold border-b border-current pb-1 mb-2">${config.title}</h2>`;
+        if (catTasks.length === 0) {
+          html += `<p class="text-sm opacity-50">（予定なし）</p>`;
+        } else {
+          catTasks.forEach(task => {
+            if (!task.completed) allCompleted = false;
+            html += `
+              <div class="flex items-center justify-between bg-white rounded-lg p-2 mb-2 shadow-sm border border-gray-100 text-gray-800 hover:border-cyan-200 transition-colors">
+                <label class="flex items-center flex-grow cursor-pointer">
+                  <input type="checkbox" class="task-checkbox w-5 h-5 text-cyan-500 rounded border-gray-300 focus:ring-cyan-400 mr-3" 
+                         ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id})">
+                  <div class="flex flex-col">
+                    <span class="text-sm font-medium ${task.completed ? 'opacity-50' : ''}">${task.text}</span>
+                    ${task.deadline && !task.completed ? `<span class="text-[11px] font-bold bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded mt-1 inline-block w-max">⏰ ${task.deadline}</span>` : ''}
+                  </div>
+                </label>
+                <div class="flex space-x-1">
+                  <button onclick="postponeTask(${task.id})" class="text-[11px] font-bold text-gray-400 hover:text-blue-500 bg-gray-50 p-2 rounded-lg min-w-max transition-colors">翌日へ</button>
+                </div>
+              </div>`;
+          });
+        }
+        html += `</div>`;
+        container.insertAdjacentHTML('beforeend', html);
+      });
+
+      document.getElementById('complete-btn').disabled = !allCompleted;
+    }
+
+    // --- Render All (Drag & Drop) ---
+    let sortableInstances = [];
+
+    function renderAll() {
+      const container = document.getElementById('all-schedule-container');
+      container.innerHTML = '';
+      
+      sortableInstances.forEach(instance => instance.destroy());
+      sortableInstances = [];
+
+      const allDates = [...new Set(Object.keys(targetTimes).concat(tasks.map(t => t.date)))].sort();
+      if(allDates.length === 0) container.innerHTML = '<p class="text-center text-gray-400">タスクがありません</p>';
+
+      allDates.forEach(dateStr => {
+        const parts = dateStr.split('-');
+        const dateDisplay = `${parseInt(parts[1])}/${parseInt(parts[2])} (${getDayOfWeek(dateStr)})`;
+        const dayTasks = tasks.filter(t => t.date === dateStr);
+        const tTime = targetTimes[dateStr] || 'なし';
+
+        let html = `
+          <div class="bg-white rounded-xl shadow-sm border border-sky-50 overflow-hidden">
+            <div class="bg-blue-50 p-2 border-b border-blue-100 flex justify-between items-center">
+              <span class="font-bold text-blue-700">${dateDisplay}</span>
+              <span class="text-xs text-blue-500 bg-white px-2 py-1 rounded-md border border-blue-200 font-bold">目標: ${tTime}</span>
+            </div>
+            <div class="p-2 min-h-[50px]">
+              <ul class="space-y-2 task-dropzone" data-date="${dateStr}">
+        `;
+
+        if (dayTasks.length === 0) {
+          html += `<li class="text-sm text-gray-400 empty-placeholder">ここにタスクをドロップ</li>`;
+        } else {
+          dayTasks.forEach(task => {
+            const config = categoryConfig[task.category];
+            html += `
+              <li class="flex items-center text-sm bg-gray-50 p-2 rounded border border-gray-100 cursor-grab active:cursor-grabbing" data-id="${task.id}">
+                <span class="inline-block w-4 h-4 mr-2 text-center ${task.completed ? 'text-emerald-400' : 'text-gray-200'}">
+                  ${task.completed ? '✔' : '⬜'}
+                </span>
+                <span class="px-1.5 py-0.5 rounded text-[10px] mr-2 font-bold ${config.color.split(' ')[0]} ${config.color.split(' ')[1]} border">
+                  ${config.tag}
+                </span>
+                <span class="flex-grow ${task.completed ? 'line-through text-gray-300' : 'text-gray-600'} font-medium pointer-events-none">${task.text}</span>
+                <button onclick="editTask(${task.id})" class="ml-2 text-gray-400 hover:text-blue-500 p-1" title="編集">✏️</button>
+                <button onclick="deleteTask(${task.id})" class="ml-1 text-gray-400 hover:text-red-500 p-1" title="削除">🗑️</button>
+              </li>`;
+          });
+        }
+        html += `</ul></div></div>`;
+        container.insertAdjacentHTML('beforeend', html);
+      });
+
+      const dropzones = document.querySelectorAll('.task-dropzone');
+      dropzones.forEach(zone => {
+        const instance = new Sortable(zone, {
+          group: 'shared',
+          animation: 150,
+          delay: 150, // 長押し判定時間
+          delayOnTouchOnly: true,
+          ghostClass: 'sortable-ghost',
+          onEnd: function (evt) {
+            const itemEl = evt.item;
+            const newDate = evt.to.getAttribute('data-date');
+            const taskId = parseInt(itemEl.getAttribute('data-id'));
+            if (!taskId || isNaN(taskId)) return;
+            const task = tasks.find(t => t.id === taskId);
+            if (task && task.date !== newDate) {
+              task.date = newDate;
+              saveAllState();
+            }
+          }
+        });
+        sortableInstances.push(instance);
+      });
+      
+      document.getElementById('new-task-date').value = formatDateString(currentDateObj);
+    }
+
+    // ==============================================
+    // セル内改行対応 TSVパーサー
+    // ==============================================
+    function processImport() {
+      const rawText = document.getElementById('import-textarea').value;
+      if (!rawText.trim()) return alert("データが貼り付けられていません。");
+      if (!confirm("現在のタスクやチェック状態はすべてリセットされます。本当によろしいですか？")) return;
+
+      const newTasks = [];
+      const newTargetTimes = {};
+      const newComments = {};
+      const currentYear = new Date().getFullYear();
+
+      // セル内改行を保持したままTSVを解析するロジック
+      function parseTSV(text) {
+        const rows = [];
+        let currentRow = [];
+        let currentCell = "";
+        let insideQuotes = false;
+        
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i];
+          const nextChar = text[i + 1];
+
+          if (insideQuotes) {
+            if (char === '"' && nextChar === '"') {
+              currentCell += '"';
+              i++;
+            } else if (char === '"') {
+              insideQuotes = false;
+            } else {
+              currentCell += char;
+            }
+          } else {
+            if (char === '"' && currentCell === "") {
+              insideQuotes = true;
+            } else if (char === '\t') {
+              currentRow.push(currentCell);
+              currentCell = "";
+            } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
+              if (char === '\r') i++;
+              currentRow.push(currentCell);
+              rows.push(currentRow);
+              currentRow = [];
+              currentCell = "";
+            } else {
+              currentCell += char;
+            }
+          }
+        }
+        if (currentCell !== "" || currentRow.length > 0) {
+          currentRow.push(currentCell);
+          rows.push(currentRow);
+        }
+        return rows;
+      }
+
+      const rows = parseTSV(rawText);
+      let taskCounterId = Date.now();
+
+      rows.forEach(cols => {
+        // 最低限「日付」がない行はスキップ
+        if (cols.length < 1 || !cols[0] || !cols[0].trim()) return;
+        if (cols[0].includes('日付')) return;
+
+        const dateMatch = cols[0].match(/(\d{1,2})[\/\uFF0F](\d{1,2})/);
+        if (!dateMatch) return;
+        const m = String(dateMatch[1]).padStart(2, '0');
+        const d = String(dateMatch[2]).padStart(2, '0');
+        const dateStr = `${currentYear}-${m}-${d}`;
+
+        if (cols[2] && cols[2].trim() !== '-' && cols[2].trim() !== '') {
+          newTargetTimes[dateStr] = cols[2].trim();
+        }
+
+        if (cols[6] && cols[6].trim() !== '-' && cols[6].trim() !== '') {
+          newComments[dateStr] = cols[6].trim();
+        }
+
+        function extractTasks(colStr, catName) {
+          if (!colStr || colStr.trim() === '-' || colStr.trim() === '') return;
+          const lines = colStr.split(/[\n\r]+/);
+          
+          lines.forEach(line => {
+            let text = line.trim();
+            if (!text) return;
+            if (text.startsWith('・') || text.startsWith('- ')) text = text.substring(1).trim();
+            
+            let deadline = null;
+            const dlMatch = text.match(/[（(](.+?締切)[）)]/);
+            if (dlMatch) {
+              deadline = dlMatch[1];
+              text = text.replace(dlMatch[0], '').trim();
+            }
+
+            taskCounterId++;
+            newTasks.push({
+              id: taskCounterId,
+              date: dateStr,
+              category: catName,
+              text: text,
+              completed: false,
+              deadline: deadline
+            });
+          });
+        }
+
+        extractTasks(cols[3], 'math');
+        extractTasks(cols[4], 'homework');
+        extractTasks(cols[5], 'other');
+      });
+
+      if (newTasks.length === 0) {
+        return alert("タスクを読み取れませんでした。列の順番やコピーの範囲を確認してください。");
+      }
+
+      tasks = newTasks;
+      targetTimes = newTargetTimes;
+      dailyComments = newComments;
+      
+      const dates = tasks.map(t => t.date).sort();
+      const parts = dates[0].split('-');
+      currentDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+
+      saveAllState();
+
+      document.getElementById('import-textarea').value = '';
+      alert("データの取り込みが完了しました！");
+      switchTab('daily');
+    }
+
+    // --- Init ---
+    renderDaily();
+    renderScope();
+  </script>
+</body>
+</html>
